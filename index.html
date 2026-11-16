@@ -124,6 +124,7 @@
 
   /* ---------- Карта ---------- */
   #s-map{padding:0;max-width:none}
+  #s-map.active{animation:none}
   #bigMap{position:fixed;left:0;right:0;top:0;bottom:calc(var(--nav-h) + var(--safe-b));background:#1b1b22;z-index:1}
   .map-top{position:fixed;left:0;right:0;top:0;z-index:5;padding:12px 12px 0;pointer-events:none}
   .map-top .chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;pointer-events:auto;padding-bottom:4px}
@@ -663,6 +664,7 @@ function initBigMap(){
   addTiles(bigMap);
   mapLayer = L.layerGroup().addTo(bigMap);
   bigMap.on('click', () => selectParty(null));
+  setTimeout(() => bigMap.invalidateSize(), 300);
   renderMapFilters();
   renderMap();
 }
@@ -766,6 +768,8 @@ $('locateBtn').onclick = () => {
   });
 };
 
+window.addEventListener('resize', () => { if (bigMap) bigMap.invalidateSize(); if (pickMap) pickMap.invalidateSize(); });
+
 /* ---------- Метка места при создании тусовки ---------- */
 let pickMap = null, pickMarker = null;
 const pick = { lat: null, lng: null };
@@ -780,6 +784,7 @@ function initPickMap(){
   pickMap = L.map('pickMap', { zoomControl: false }).setView(MSK, 11);
   addTiles(pickMap);
   pickMap.on('click', e => setPick(e.latlng.lat, e.latlng.lng, true));
+  setTimeout(() => pickMap.invalidateSize(), 300);
 }
 function setPick(lat, lng, fillAddress){
   pick.lat = lat; pick.lng = lng;
