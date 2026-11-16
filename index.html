@@ -6,6 +6,9 @@
 <title>Тусовка</title>
 <!-- Библиотека Telegram Mini Apps. Вне Telegram приложение тоже работает, просто без её функций -->
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<!-- Leaflet — бесплатная библиотека для карт -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
   :root{
     --bg:#0e0e13; --card:#1a1a22; --card2:#252530; --text:#f4f4f7; --muted:#8d8d9c; --line:#2a2a36;
@@ -118,6 +121,33 @@
   .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
   .success-ico{width:84px;height:84px;border-radius:28px;background:var(--grad);display:grid;place-items:center;font-size:42px;margin:20px auto 16px;box-shadow:0 10px 30px rgba(139,92,255,.4)}
   .center{text-align:center}
+
+  /* ---------- Карта ---------- */
+  #s-map{padding:0;max-width:none}
+  #bigMap{position:fixed;left:0;right:0;top:0;bottom:calc(var(--nav-h) + var(--safe-b));background:#1b1b22;z-index:1}
+  .map-top{position:fixed;left:0;right:0;top:0;z-index:5;padding:12px 12px 0;pointer-events:none}
+  .map-top .chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;pointer-events:auto;padding-bottom:4px}
+  .map-top .chips::-webkit-scrollbar{display:none}
+  .map-top .chip{white-space:nowrap;background:rgba(26,26,34,.92);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+  .map-top .chip.on{background:var(--grad)}
+  .map-count{display:inline-block;margin-top:6px;font-size:12px;font-weight:600;color:var(--muted);background:rgba(26,26,34,.92);padding:5px 10px;border-radius:10px}
+  .fab{position:fixed;right:14px;bottom:calc(var(--nav-h) + var(--safe-b) + 16px);z-index:5;width:48px;height:48px;border-radius:16px;border:1px solid var(--line);background:rgba(26,26,34,.95);color:var(--text);display:grid;place-items:center;box-shadow:0 4px 16px rgba(0,0,0,.4)}
+  .fab svg{width:22px;height:22px}
+  .sheet{position:fixed;left:10px;right:10px;bottom:calc(var(--nav-h) + var(--safe-b) + 10px);z-index:6;max-width:540px;margin:0 auto;box-shadow:0 10px 40px rgba(0,0,0,.6);border-radius:20px;animation:fade .2s ease}
+  .sheet.hidden{display:none}
+  .pin{width:42px;height:42px;border-radius:50% 50% 50% 4px;transform:rotate(-45deg);background:var(--card);border:2px solid var(--a2);display:grid;place-items:center;box-shadow:0 4px 12px rgba(0,0,0,.5)}
+  .pin span{transform:rotate(45deg);font-size:20px;line-height:1}
+  .pin.mine{border-color:var(--a1)}
+  .pin.sel{background:var(--grad);border-color:#fff}
+  .me-dot{width:16px;height:16px;border-radius:50%;background:#3d9bff;border:3px solid #fff;box-shadow:0 0 0 6px rgba(61,155,255,.25)}
+  .leaflet-container{font-family:inherit;background:#1b1b22}
+  .leaflet-control-attribution{background:rgba(14,14,19,.7)!important;color:#777!important;font-size:9px!important}
+  .leaflet-control-attribution a{color:#999!important}
+  .picker{height:210px;border-radius:14px;overflow:hidden;border:1px solid var(--line);margin-top:10px;position:relative;z-index:0}
+  .picker-hint{font-size:12px;color:var(--muted);margin-top:7px}
+  .picker-hint.ok{color:#3ddc84}
+  .mini-btns{display:flex;gap:8px;margin-top:8px}
+  .mini-btn{flex:1;background:var(--card2);border:0;color:var(--text);border-radius:12px;padding:10px;font-size:13px;font-weight:600}
 </style>
 </head>
 <body>
@@ -131,13 +161,17 @@
   </div>
 </section>
 
-<!-- ================= ЗАГЛУШКА 2 ================= -->
-<section class="screen" id="s-stub2">
-  <div class="stub-box">
-    <div class="big">🛠️</div>
-    <h1>Скоро здесь</h1>
-    <p>Этот раздел пока в разработке</p>
+<!-- ================= КАРТА ================= -->
+<section class="screen" id="s-map">
+  <div id="bigMap"></div>
+  <div class="map-top">
+    <div class="chips" id="mapFilters"></div>
+    <div class="map-count" id="mapCount"></div>
   </div>
+  <button class="fab" id="locateBtn" aria-label="Где я">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+  </button>
+  <div class="sheet hidden" id="mapSheet"></div>
 </section>
 
 <!-- ================= СОЗДАТЬ ТУСОВКУ ================= -->
@@ -168,6 +202,12 @@
   <div class="field">
     <label class="lbl" for="fPlace">Где <b>*</b></label>
     <input class="input" id="fPlace" maxlength="100" placeholder="Адрес, бар, парк или район">
+    <div class="picker" id="pickMap"></div>
+    <div class="mini-btns" id="pickBtns">
+      <button type="button" class="mini-btn" id="findAddr">🔎 Найти адрес</button>
+      <button type="button" class="mini-btn" id="pickMe">📍 Я здесь</button>
+    </div>
+    <div class="picker-hint" id="pickHint">Нажми на карту, чтобы поставить метку — так тусовку найдут люди поблизости</div>
   </div>
 
   <div class="field">
@@ -270,9 +310,9 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
     Скоро
   </button>
-  <button class="tab stub" data-go="stub2">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-    Скоро
+  <button class="tab" data-go="map">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg>
+    Карта
   </button>
   <button class="tab tab-center" data-go="create" aria-label="Создать тусовку">
     <span class="plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
@@ -358,6 +398,19 @@ let profile = store.get('profile', null) || {
 let parties = store.get('parties', []);
 let invites = store.get('invites', DEMO_INVITES);
 
+// Примеры открытых тусовок на карте (пока нет сервера)
+const DEMO_PUBLIC = [
+  { id:'m1', emoji:'🎲', title:'Настолки для новичков', type:'Настолки', host:'Лиза', when:daysFromNow(1,19), place:'Антикафе у Курской', lat:55.7586, lng:37.6610, going:5, max:8 },
+  { id:'m2', emoji:'🍻', title:'Знакомства в баре: приходи один', type:'Бар', host:'Артём', when:daysFromNow(2,20), place:'Бар на Покровке', lat:55.7594, lng:37.6476, going:9, max:15 },
+  { id:'m3', emoji:'🎤', title:'Караоке-баттл', type:'Караоке', host:'Катя', when:daysFromNow(3,21), place:'Караоке на Новом Арбате', lat:55.7527, lng:37.5870, going:6, max:10 },
+  { id:'m4', emoji:'🏀', title:'Стритбол 3×3', type:'Спорт', host:'Макс', when:daysFromNow(5,12), place:'Парк Горького', lat:55.7298, lng:37.6011, going:7, max:12 },
+  { id:'m5', emoji:'🌃', title:'Вечерняя прогулка по набережным', type:'Прогулка', host:'Оля', when:daysFromNow(2,18), place:'Парк Зарядье', lat:55.7510, lng:37.6290, going:4, max:10 },
+  { id:'m6', emoji:'🎬', title:'Киновечер: смотрим классику', type:'Кино', host:'Саша', when:daysFromNow(4,19), place:'Лофт у Электрозаводской', lat:55.7820, lng:37.7040, going:8, max:12 },
+  { id:'m7', emoji:'🎮', title:'Вечер приставок: FIFA и Mortal Kombat', type:'Игры', host:'Денис', when:daysFromNow(3,18), place:'Рядом с м. Динамо', lat:55.7897, lng:37.5585, going:3, max:6 },
+  { id:'m8', emoji:'💃', title:'Танцевальная вечеринка', type:'Домашняя вечеринка', host:'Вика', when:daysFromNow(6,22), place:'Красный Октябрь', lat:55.7413, lng:37.6094, going:12, max:20 }
+];
+let joined = store.get('joined', []);
+
 /* =========================================================
    Навигация
    ========================================================= */
@@ -368,6 +421,8 @@ function show(name){
   window.scrollTo(0, 0);
   if (name === 'invites') renderInvites();
   if (name === 'profile') renderProfile();
+  if (name === 'map') initBigMap();
+  if (name === 'create') initPickMap();
 }
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
   haptic(t.dataset.go === 'create' ? 'medium' : 'light');
@@ -383,6 +438,7 @@ function buildCreateForm(){
   $('emojiPicker').innerHTML = EMOJIS.map(e => `<button type="button" class="emo${e === form.emoji ? ' on' : ''}" data-e="${e}">${e}</button>`).join('');
   $('typeChips').innerHTML = TYPES.map(t => `<button type="button" class="chip${t === form.type ? ' on' : ''}" data-t="${esc(t)}">${esc(t)}</button>`).join('');
   $('maxVal').textContent = form.max;
+  if (pickMarker) pickMarker.setIcon(pinIcon({ emoji: form.emoji, mine: true }, false));
   // нельзя выбрать дату в прошлом
   const now = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
   $('fWhen').min = now.toISOString().slice(0, 16);
@@ -415,7 +471,7 @@ $('createBtn').onclick = () => {
   const p = {
     id: Date.now().toString(36), emoji: form.emoji, title, type: form.type, when: new Date(when).toISOString(),
     place, max: form.max, private: $('fPrivate').checked, adult: $('fAdult').checked,
-    desc: $('fDesc').value.trim(), created: Date.now()
+    desc: $('fDesc').value.trim(), created: Date.now(), lat: pick.lat, lng: pick.lng
   };
   parties.unshift(p);
   store.set('parties', parties);
@@ -423,7 +479,7 @@ $('createBtn').onclick = () => {
   // очистить форму
   ['fTitle','fWhen','fPlace','fDesc'].forEach(id => $(id).value = '');
   $('fPrivate').checked = false; $('fAdult').checked = false;
-  form.emoji = EMOJIS[0]; form.type = ''; form.max = 6; buildCreateForm();
+  form.emoji = EMOJIS[0]; form.type = ''; form.max = 6; resetPick(); buildCreateForm();
 
   vibe('success');
   lastCreated = p;
@@ -527,7 +583,7 @@ function partyCard(p, withDelete){
       </div>
       ${withDelete ? `<button class="x" data-del="${esc(p.id)}" aria-label="Удалить">×</button>` : ''}
     </div>
-    ${withDelete ? `<div class="row"><button class="btn ghost" data-share="${esc(p.id)}">📨 Позвать друзей</button></div>` : ''}
+    ${withDelete ? `<div class="row">${p.lat != null ? `<button class="btn ghost" data-onmap="${esc(p.id)}">🗺 На карте</button>` : ''}<button class="btn ghost" data-share="${esc(p.id)}">📨 Позвать друзей</button></div>` : ''}
   </div>`;
 }
 function renderInterestChips(){
@@ -542,7 +598,7 @@ function renderProfile(){
   $('pDistrict').value = profile.district; $('pAbout').value = profile.about;
   renderInterestChips();
   $('stCreated').textContent = parties.length;
-  $('stGoing').textContent = invites.filter(i => i.status === 'going').length;
+  $('stGoing').textContent = invites.filter(i => i.status === 'going').length + joined.length;
   $('myParties').innerHTML = parties.length
     ? parties.map(p => partyCard(p, true)).join('')
     : `<div class="empty"><div class="big">🪩</div>Ты ещё не создал ни одной тусовки.<br>Жми на «+» внизу!</div>`;
@@ -566,6 +622,8 @@ $('saveProfile').onclick = () => {
 $('myParties').addEventListener('click', e => {
   const del = e.target.closest('[data-del]');
   const sh = e.target.closest('[data-share]');
+  const om = e.target.closest('[data-onmap]');
+  if (om) { haptic(); openOnMap(om.dataset.onmap); return; }
   if (del) {
     parties = parties.filter(p => p.id !== del.dataset.del);
     store.set('parties', parties); haptic(); toast('Тусовка удалена'); renderProfile();
@@ -573,6 +631,205 @@ $('myParties').addEventListener('click', e => {
     const p = parties.find(x => x.id === sh.dataset.share); if (p) { haptic(); shareParty(p); }
   }
 });
+
+/* =========================================================
+   КАРТА
+   ========================================================= */
+const MSK = [55.7558, 37.6173];
+const TILE = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+const TILE_ATTR = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>';
+const hasLeaflet = () => typeof window.L !== 'undefined';
+const plural = (n, a, b, c) => { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20) ? b : c); };
+const pinIcon = (p, sel) => L.divIcon({ className: '', html: `<div class="pin${p.mine ? ' mine' : ''}${sel ? ' sel' : ''}"><span>${esc(p.emoji)}</span></div>`, iconSize: [42, 42], iconAnchor: [21, 51] });
+function addTiles(map){
+  L.tileLayer(TILE, { attribution: TILE_ATTR, subdomains: 'abcd', maxZoom: 19 }).addTo(map);
+  map.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
+}
+
+let bigMap = null, mapLayer = null, meMarker = null, mapFilter = '', selectedId = null;
+
+function mapParties(){
+  const mine = parties.filter(p => p.lat != null).map(p => ({ ...p, mine: true, going: 1 }));
+  const demo = DEMO_PUBLIC.map(p => ({ ...p, joined: joined.includes(p.id), going: p.going + (joined.includes(p.id) ? 1 : 0) }));
+  return [...mine, ...demo].filter(p => !mapFilter || p.type === mapFilter);
+}
+function initBigMap(){
+  if (!hasLeaflet()) {
+    $('bigMap').innerHTML = '<div class="empty" style="padding-top:140px"><div class="big">🗺️</div>Карта не загрузилась.<br>Проверь интернет и открой приложение заново.</div>';
+    return;
+  }
+  if (bigMap) { bigMap.invalidateSize(); renderMap(); return; }
+  bigMap = L.map('bigMap', { zoomControl: false }).setView(MSK, 12);
+  addTiles(bigMap);
+  mapLayer = L.layerGroup().addTo(bigMap);
+  bigMap.on('click', () => selectParty(null));
+  renderMapFilters();
+  renderMap();
+}
+function renderMapFilters(){
+  $('mapFilters').innerHTML = ['', ...TYPES].map(t =>
+    `<button type="button" class="chip${t === mapFilter ? ' on' : ''}" data-f="${esc(t)}">${t ? esc(t) : 'Все'}</button>`).join('');
+}
+function renderMap(){
+  if (!bigMap) return;
+  mapLayer.clearLayers();
+  const list = mapParties();
+  list.forEach(p => {
+    const m = L.marker([p.lat, p.lng], { icon: pinIcon(p, p.id === selectedId), zIndexOffset: p.id === selectedId ? 1000 : 0 });
+    m.on('click', ev => { L.DomEvent.stopPropagation(ev); selectParty(p.id); });
+    m.addTo(mapLayer);
+  });
+  const n = list.length;
+  $('mapCount').textContent = n ? `${n} ${plural(n, 'тусовка', 'тусовки', 'тусовок')} на карте` : 'Здесь пока пусто';
+}
+function selectParty(id){
+  selectedId = id;
+  renderMap();
+  const sheet = $('mapSheet');
+  const p = id ? mapParties().find(x => x.id === id) : null;
+  if (!p) { sheet.classList.add('hidden'); $('locateBtn').style.display = ''; return; }
+  $('locateBtn').style.display = 'none';
+  const pct = Math.min(100, Math.round(p.going / p.max * 100));
+  const action = p.mine
+    ? `<button class="btn ghost" data-mshare="${esc(p.id)}">📨 Позвать друзей</button>`
+    : p.joined
+      ? `<button class="btn ghost" data-mleave="${esc(p.id)}">✓ Ты идёшь · отменить</button>`
+      : `<button class="btn" data-mjoin="${esc(p.id)}">Пойду! 🙌</button>`;
+  sheet.innerHTML = `
+  <div class="card" style="margin:0">
+    <div class="card-top">
+      <div class="cover">${esc(p.emoji)}</div>
+      <div style="flex:1;min-width:0">
+        <div class="title">${esc(p.title)}</div>
+        <div class="meta">📅 ${esc(fmt(p.when))}<br>📍 ${esc(p.place)}<br>👤 ${p.mine ? 'Твоя тусовка' : 'Зовёт ' + esc(p.host)}</div>
+        ${p.type ? `<span class="tag">${esc(p.type)}</span>` : ''}${p.mine ? '' : '<span class="tag">пример</span>'}
+      </div>
+      <button class="x" data-mclose="1" aria-label="Закрыть">×</button>
+    </div>
+    <div class="bar"><i style="width:${pct}%"></i></div>
+    <div class="bar-txt">Идут ${p.going} из ${p.max}</div>
+    <div class="row">${action}</div>
+  </div>`;
+  sheet.classList.remove('hidden');
+}
+$('mapFilters').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  mapFilter = b.dataset.f; haptic(); renderMapFilters(); selectParty(null);
+});
+$('mapSheet').addEventListener('click', e => {
+  const t = e.target.closest('button'); if (!t) return;
+  const d = t.dataset;
+  if (d.mjoin) {
+    const p = mapParties().find(x => x.id === d.mjoin);
+    if (p && p.going >= p.max) { vibe('error'); toast('Мест уже нет 😔'); return; }
+    joined.push(d.mjoin); store.set('joined', joined); vibe('success'); toast('Супер, ты в деле! 🎉'); selectParty(d.mjoin);
+  } else if (d.mleave) {
+    joined = joined.filter(x => x !== d.mleave); store.set('joined', joined); haptic(); toast('Окей, отменили'); selectParty(d.mleave);
+  } else if (d.mshare) {
+    const p = parties.find(x => x.id === d.mshare); if (p) { haptic(); shareParty(p); }
+  } else if (d.mclose) {
+    haptic(); selectParty(null);
+  }
+});
+function openOnMap(id){
+  const p = parties.find(x => x.id === id); if (!p || p.lat == null) return;
+  mapFilter = '';
+  show('map');
+  if (!bigMap) return;
+  renderMapFilters();
+  bigMap.setView([p.lat, p.lng], 15);
+  selectParty(id);
+}
+
+// Где я: сначала через Telegram, иначе через браузер
+function getMyLocation(cb){
+  const viaBrowser = () => {
+    if (!navigator.geolocation) return cb(null);
+    navigator.geolocation.getCurrentPosition(pos => cb([pos.coords.latitude, pos.coords.longitude]), () => cb(null), { enableHighAccuracy: true, timeout: 10000 });
+  };
+  const lm = tg && tg.LocationManager;
+  if (!lm || !lm.init) return viaBrowser();
+  const run = () => {
+    if (!lm.isLocationAvailable) return viaBrowser();
+    lm.getLocation(d => d ? cb([d.latitude, d.longitude]) : cb(null));
+  };
+  try { lm.isInited ? run() : lm.init(run); } catch(e) { viaBrowser(); }
+}
+$('locateBtn').onclick = () => {
+  haptic(); toast('Ищем тебя…');
+  getMyLocation(ll => {
+    if (!ll) { toast('Не получилось — разреши доступ к геопозиции'); return; }
+    if (!bigMap) return;
+    const icon = L.divIcon({ className: '', html: '<div class="me-dot"></div>', iconSize: [16, 16], iconAnchor: [8, 8] });
+    if (meMarker) meMarker.setLatLng(ll); else meMarker = L.marker(ll, { icon, interactive: false }).addTo(bigMap);
+    bigMap.setView(ll, 14);
+  });
+};
+
+/* ---------- Метка места при создании тусовки ---------- */
+let pickMap = null, pickMarker = null;
+const pick = { lat: null, lng: null };
+const PICK_HINT = 'Нажми на карту, чтобы поставить метку — так тусовку найдут люди поблизости';
+function initPickMap(){
+  if (!hasLeaflet()) {
+    $('pickMap').style.display = 'none'; $('pickBtns').style.display = 'none';
+    $('pickHint').textContent = 'Карта не загрузилась — тусовка будет без метки';
+    return;
+  }
+  if (pickMap) { pickMap.invalidateSize(); return; }
+  pickMap = L.map('pickMap', { zoomControl: false }).setView(MSK, 11);
+  addTiles(pickMap);
+  pickMap.on('click', e => setPick(e.latlng.lat, e.latlng.lng, true));
+}
+function setPick(lat, lng, fillAddress){
+  pick.lat = lat; pick.lng = lng;
+  const icon = pinIcon({ emoji: form.emoji, mine: true }, false);
+  if (pickMarker) { pickMarker.setLatLng([lat, lng]); pickMarker.setIcon(icon); }
+  else pickMarker = L.marker([lat, lng], { icon }).addTo(pickMap);
+  $('pickHint').textContent = '✓ Метка стоит — тусовку будет видно на карте';
+  $('pickHint').classList.add('ok');
+  haptic();
+  if (fillAddress && !$('fPlace').value.trim()) reverseGeocode(lat, lng);
+}
+function resetPick(){
+  pick.lat = pick.lng = null;
+  if (pickMarker) { pickMarker.remove(); pickMarker = null; }
+  $('pickHint').textContent = PICK_HINT; $('pickHint').classList.remove('ok');
+}
+// Поиск адреса — бесплатный сервис OpenStreetMap (Nominatim)
+async function geocode(q){
+  const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=ru&viewbox=37.3,55.95,37.95,55.55&q=' + encodeURIComponent(q);
+  const j = await (await fetch(url)).json();
+  return j && j[0] ? [+j[0].lat, +j[0].lon] : null;
+}
+async function reverseGeocode(lat, lng){
+  try {
+    const j = await (await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&accept-language=ru&zoom=18&lat=${lat}&lon=${lng}`)).json();
+    const a = j.address || {};
+    const street = [a.road || a.pedestrian || a.square, a.house_number].filter(Boolean).join(', ');
+    const label = [j.name, street].filter(Boolean).join(', ') || a.suburb || '';
+    if (label && !$('fPlace').value.trim()) $('fPlace').value = label;
+  } catch(e){}
+}
+$('findAddr').onclick = async () => {
+  const q = $('fPlace').value.trim();
+  if (!q) { $('fPlace').classList.add('err'); $('fPlace').focus(); toast('Сначала впиши адрес или место'); return; }
+  if (!pickMap) return;
+  haptic(); toast('Ищем на карте…');
+  try {
+    const ll = await geocode(q);
+    if (ll) { setPick(ll[0], ll[1], false); pickMap.setView(ll, 15); toast('Нашли! Если метка не там — нажми на карту'); }
+    else toast('Не нашли — поставь метку вручную');
+  } catch(e){ toast('Поиск не сработал — поставь метку вручную'); }
+};
+$('pickMe').onclick = () => {
+  if (!pickMap) return;
+  haptic(); toast('Ищем тебя…');
+  getMyLocation(ll => {
+    if (!ll) { toast('Не получилось — разреши доступ к геопозиции'); return; }
+    setPick(ll[0], ll[1], true); pickMap.setView(ll, 15);
+  });
+};
 
 // Загрузка фото: обрезаем до квадрата и уменьшаем, чтобы не занимало много места
 $('camBtn').onclick = () => $('photoInput').click();
