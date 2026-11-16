@@ -4,7 +4,7 @@
 
 // ===== НАСТРОЙКИ =====
 var API = 'https://d5djhv475n138aegoga9.xxg4zr82.apigw.yandexcloud.net/api';
-var APP_LINK = 'https://t.me/PartyHubbBot/app';
+var APP_LINK = 'https://t.me/PartyHubbBot/party';
 var BOT_LINK = 'https://t.me/PartyHubbBot';
 var EMOJIS = ['🎉','🍕','🎲','🎤','🍻','🏀','🎬','🎮','💃','🌃','🏕️','☕'];
 var TYPES = ['Домашняя вечеринка','Бар','Настолки','Караоке','Спорт','Прогулка','Кино','Игры','Другое'];
