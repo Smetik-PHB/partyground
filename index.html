@@ -165,17 +165,39 @@
   .btn[disabled]{opacity:.6}
   .desc{font-size:14px;margin-top:12px;white-space:pre-wrap;word-break:break-word}
   .card[data-open]{cursor:pointer}
+  .hscroll{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:0 16px 4px;margin:0 -16px}
+  .hscroll::-webkit-scrollbar{display:none}
+  .hscroll .chip{white-space:nowrap;flex:0 0 auto}
+  .search-head{display:flex;justify-content:space-between;align-items:center;margin:24px 0 10px}
+  .link-btn{background:none;border:0;color:#b9a3ff;font-weight:600;font-size:14px;padding:4px 0}
+  input[type=search].input::-webkit-search-cancel-button{display:none}
 </style>
 </head>
 <body>
 
-<!-- ================= ЗАГЛУШКА 1 ================= -->
-<section class="screen" id="s-stub1">
-  <div class="stub-box">
-    <div class="big">🚧</div>
-    <h1>Скоро здесь</h1>
-    <p>Этот раздел пока в разработке</p>
-  </div>
+<!-- ================= ПОИСК ================= -->
+<section class="screen" id="s-search">
+  <h1>Поиск</h1>
+  <p class="sub">Найди тусовку по душе</p>
+  <input class="input" id="sQuery" type="search" placeholder="🔎 Название, место или описание" autocomplete="off">
+  <div class="section-title">Когда</div>
+  <div class="hscroll" id="sWhen"></div>
+  <div class="section-title">Формат</div>
+  <div class="hscroll" id="sTypes"></div>
+  <div class="section-title">Ещё</div>
+  <label class="switch-row">
+    <span>Есть свободные места</span>
+    <span class="switch"><input type="checkbox" id="sFree"><i></i></span>
+  </label>
+  <label class="switch-row">
+    <span>Рядом со мной<small>Покажем тусовки в выбранном радиусе</small></span>
+    <span class="switch"><input type="checkbox" id="sNear"><i></i></span>
+  </label>
+  <div id="sRadiusWrap" style="display:none;margin-bottom:6px"><div class="hscroll" id="sRadius"></div></div>
+  <div class="search-head"><span class="section-title" style="margin:0">Результаты</span><button type="button" class="link-btn" id="sReset">Сбросить фильтры</button></div>
+  <div class="hscroll" id="sSort" style="margin-bottom:10px"></div>
+  <div class="bar-txt" id="sCount" style="margin:0 0 10px"></div>
+  <div id="sResults"></div>
 </section>
 
 <!-- ================= КАРТА ================= -->
@@ -325,9 +347,9 @@
 
 <!-- ================= НИЖНЯЯ ПАНЕЛЬ (5 кнопок) ================= -->
 <nav class="nav">
-  <button class="tab stub" data-go="stub1">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
-    Скоро
+  <button class="tab" data-go="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    Поиск
   </button>
   <button class="tab" data-go="map">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/></svg>
@@ -356,6 +378,6 @@
 <div class="modal hidden" id="partyModal"><div class="modal-card" id="partyModalBody"></div></div>
 <div class="toast" id="toast"></div>
 
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

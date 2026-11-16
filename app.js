@@ -76,6 +76,7 @@ function refreshParties() {
     parties = r.parties || [];
     if (current === 'map') renderMap();
     if (current === 'profile') renderProfile();
+    if (current === 'search') renderSearch();
   }).catch(function (e) { toast(e.message); });
 }
 function refreshInvites() {
@@ -98,6 +99,7 @@ function show(name) {
   if (name === 'profile') { renderProfile(); refreshParties(); }
   if (name === 'map') { initBigMap(); refreshParties(); }
   if (name === 'create') initPickMap();
+  if (name === 'search') { renderSearchFilters(); renderSearch(); refreshParties(); }
 }
 document.querySelectorAll('.tab').forEach(function (t) {
   t.addEventListener('click', function () { haptic(t.dataset.go === 'create' ? 'medium' : 'light'); show(t.dataset.go); });
@@ -526,6 +528,99 @@ $('pickMe').onclick = function () {
     if (!ll) { toast('Не получилось — разреши доступ к геопозиции'); return; }
     setPick(ll[0], ll[1], true); pickMap.setView(ll, 15);
   });
+};
+
+// ===== Поиск =====
+var sf = { q: '', when: 'all', types: [], free: false, near: false, radius: 5, sort: 'date' };
+var myPos = null;
+var WHEN = [['all', 'Любое время'], ['today', 'Сегодня'], ['tomorrow', 'Завтра'], ['weekend', 'Выходные'], ['week', '7 дней']];
+var SORTS = [['date', 'Скоро'], ['near', 'Ближе ко мне'], ['popular', 'Популярные']];
+var RADII = [1, 3, 5, 10, 25];
+function km(a, b) {
+  var toR = Math.PI / 180, dLat = (b[0] - a[0]) * toR, dLng = (b[1] - a[1]) * toR;
+  var h = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a[0] * toR) * Math.cos(b[0] * toR) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+}
+function fmtKm(d) { return d < 1 ? Math.max(50, Math.round(d * 20) * 50) + ' м' : String(Math.round(d * 10) / 10).replace('.', ',') + ' км'; }
+function whenRange(key) {
+  var now = new Date(), day = 86400000;
+  var d0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  if (key === 'today') return [d0, d0 + day];
+  if (key === 'tomorrow') return [d0 + day, d0 + 2 * day];
+  if (key === 'week') return [now.getTime() - 6 * 3600000, now.getTime() + 7 * day];
+  if (key === 'weekend') { var wd = now.getDay(); var sat = wd === 0 ? d0 - day : d0 + (6 - wd) * day; return [sat, sat + 2 * day]; }
+  return null;
+}
+function sChips(items, isOn, attr) {
+  return items.map(function (it) {
+    return '<button type="button" class="chip' + (isOn(it[0]) ? ' on' : '') + '" data-' + attr + '="' + esc(it[0]) + '">' + esc(it[1]) + '</button>';
+  }).join('');
+}
+function renderSearchFilters() {
+  $('sWhen').innerHTML = sChips(WHEN, function (k) { return sf.when === k; }, 'when');
+  $('sTypes').innerHTML = sChips(TYPES.map(function (t) { return [t, t]; }), function (k) { return sf.types.indexOf(k) >= 0; }, 'type');
+  $('sSort').innerHTML = sChips(SORTS, function (k) { return sf.sort === k; }, 'sort');
+  $('sRadius').innerHTML = sChips(RADII.map(function (r) { return [String(r), 'до ' + r + ' км']; }), function (k) { return String(sf.radius) === k; }, 'radius');
+  $('sRadiusWrap').style.display = sf.near ? '' : 'none';
+  $('sQuery').value = sf.q; $('sFree').checked = sf.free; $('sNear').checked = sf.near;
+}
+function searchResults() {
+  var q = sf.q.trim().toLowerCase(), range = whenRange(sf.when);
+  var list = parties.filter(function (p) {
+    if (q && [p.title, p.place, p.desc, p.type, p.host].join(' ').toLowerCase().indexOf(q) < 0) return false;
+    if (sf.types.length && sf.types.indexOf(p.type) < 0) return false;
+    if (sf.free && !p.joined && p.going >= p.max) return false;
+    if (range) { var t = new Date(p.when).getTime(); if (t < range[0] || t >= range[1]) return false; }
+    if (sf.near && (!myPos || p.lat == null || km(myPos, [p.lat, p.lng]) > sf.radius)) return false;
+    return true;
+  });
+  list.forEach(function (p) { p._km = myPos && p.lat != null ? km(myPos, [p.lat, p.lng]) : null; });
+  list.sort(function (a, b) {
+    if (sf.sort === 'near') return (a._km == null ? 1e9 : a._km) - (b._km == null ? 1e9 : b._km);
+    if (sf.sort === 'popular') return b.going - a.going;
+    return new Date(a.when) - new Date(b.when);
+  });
+  return list;
+}
+function renderSearch() {
+  var list = searchResults(), n = list.length;
+  $('sCount').textContent = n ? 'Найдено: ' + n + ' ' + plural(n, 'тусовка', 'тусовки', 'тусовок') : '';
+  $('sResults').innerHTML = n ? list.map(function (p) {
+    return partyCard(p, p._km != null ? '<div class="bar-txt" style="margin-top:10px">🧭 ' + fmtKm(p._km) + ' от тебя</div>' : '');
+  }).join('') : '<div class="empty"><div class="big">🔍</div>' +
+    (parties.length ? 'Ничего не нашлось.<br>Попробуй ослабить фильтры.' : 'Пока тусовок нет.<br>Создай первую — жми «+» внизу!') + '</div>';
+}
+function needPos(cb) {
+  if (myPos) return cb(true);
+  toast('Определяем, где ты…');
+  getMyLocation(function (ll) {
+    if (ll) { myPos = ll; cb(true); } else { toast('Не получилось — разреши доступ к геопозиции'); cb(false); }
+  });
+}
+$('s-search').addEventListener('click', function (e) {
+  var b = e.target.closest('[data-when],[data-type],[data-sort],[data-radius]');
+  if (b) {
+    haptic();
+    var d = b.dataset;
+    if (d.when) sf.when = d.when;
+    if (d.type) sf.types = sf.types.indexOf(d.type) >= 0 ? sf.types.filter(function (x) { return x !== d.type; }) : sf.types.concat([d.type]);
+    if (d.radius) sf.radius = +d.radius;
+    if (d.sort === 'near') { needPos(function (ok) { if (ok) { sf.sort = 'near'; renderSearchFilters(); renderSearch(); } }); return; }
+    if (d.sort) sf.sort = d.sort;
+    renderSearchFilters(); renderSearch(); return;
+  }
+  var c = e.target.closest('[data-open]'); if (c) { haptic(); openParty(c.dataset.open); }
+});
+$('sQuery').addEventListener('input', function () { sf.q = this.value; renderSearch(); });
+$('sFree').addEventListener('change', function () { sf.free = this.checked; haptic(); renderSearch(); });
+$('sNear').addEventListener('change', function () {
+  haptic();
+  if (!this.checked) { sf.near = false; renderSearchFilters(); renderSearch(); return; }
+  needPos(function (ok) { sf.near = ok; renderSearchFilters(); renderSearch(); });
+});
+$('sReset').onclick = function () {
+  sf = { q: '', when: 'all', types: [], free: false, near: false, radius: 5, sort: 'date' };
+  haptic(); renderSearchFilters(); renderSearch();
 };
 
 // ===== Старт =====
