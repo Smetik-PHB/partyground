@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Тусовка</title>
+<!-- Библиотека Telegram Mini Apps. Вне Telegram приложение тоже работает, просто без её функций -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root{
+    --bg:#0e0e13; --card:#1a1a22; --card2:#252530; --text:#f4f4f7; --muted:#8d8d9c; --line:#2a2a36;
+    --a1:#ff3d7f; --a2:#8b5cff; --grad:linear-gradient(135deg,var(--a1),var(--a2));
+    --nav-h:68px; --safe-b:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,sans-serif;font-size:15px;line-height:1.35}
+  body{min-height:100vh;overscroll-behavior:none}
+  button{font-family:inherit;cursor:pointer}
+
+  /* ---------- Экраны ---------- */
+  .screen{display:none;padding:18px 16px calc(var(--nav-h) + 28px + var(--safe-b));max-width:560px;margin:0 auto}
+  .screen.active{display:block;animation:fade .22s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  h1{font-size:27px;font-weight:800;letter-spacing:-.02em;margin:2px 0 4px}
+  .sub{color:var(--muted);margin-bottom:20px}
+  .section-title{font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin:24px 0 10px}
+
+  /* ---------- Нижняя панель ---------- */
+  .nav{position:fixed;left:0;right:0;bottom:0;z-index:10;height:calc(var(--nav-h) + var(--safe-b));padding-bottom:var(--safe-b);
+       background:rgba(16,16,22,.92);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border-top:1px solid var(--line);display:flex}
+  .tab{flex:1;background:none;border:0;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;font-size:11px;font-weight:600;position:relative;transition:color .15s}
+  .tab svg{width:25px;height:25px}
+  .tab.active{color:var(--text)}
+  .tab.active:not(.tab-center)::after{content:"";position:absolute;top:0;width:26px;height:3px;border-radius:0 0 3px 3px;background:var(--grad)}
+  .tab.stub{opacity:.45}
+  .tab-center .plus{width:58px;height:58px;border-radius:20px;background:var(--grad);display:grid;place-items:center;color:#fff;
+       box-shadow:0 8px 24px rgba(255,61,127,.45);transform:translateY(-16px);transition:transform .15s}
+  .tab-center .plus svg{width:30px;height:30px}
+  .tab-center:active .plus{transform:translateY(-16px) scale(.9)}
+  .badge{position:absolute;top:9px;left:calc(50% + 5px);background:var(--a1);color:#fff;font-size:10px;font-weight:800;min-width:18px;height:18px;border-radius:9px;display:grid;place-items:center;padding:0 5px;border:2px solid #101016}
+  .badge:empty{display:none}
+
+  /* ---------- Формы ---------- */
+  .field{margin-bottom:18px}
+  .lbl{display:block;font-size:13px;color:var(--muted);margin-bottom:7px;font-weight:600}
+  .lbl b{color:var(--a1)}
+  .input{width:100%;background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:14px;padding:13px 14px;font-size:16px;font-family:inherit;outline:none;transition:border-color .15s;-webkit-appearance:none;appearance:none}
+  .input:focus{border-color:var(--a2)}
+  .input.err{border-color:var(--a1)}
+  .input::placeholder{color:#5e5e6c}
+  textarea.input{min-height:96px;resize:vertical}
+  input[type=datetime-local].input{color-scheme:dark;min-height:50px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:999px;padding:8px 14px;font-size:14px;transition:.15s}
+  .chip.on{background:var(--grad);border-color:transparent;color:#fff}
+  .emojis{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none}
+  .emojis::-webkit-scrollbar{display:none}
+  .emo{font-size:26px;width:54px;height:54px;flex:0 0 54px;border-radius:15px;background:var(--card);border:2px solid transparent;transition:.15s}
+  .emo.on{border-color:var(--a1);background:var(--card2);transform:scale(1.04)}
+  .stepper{display:inline-flex;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:14px}
+  .stepper button{width:48px;height:48px;background:none;border:0;color:var(--text);font-size:22px}
+  .stepper span{min-width:44px;text-align:center;font-weight:800;font-size:18px}
+  .switch-row{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:10px}
+  .switch-row small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+  .switch{position:relative;width:50px;height:30px;flex:0 0 50px}
+  .switch input{position:absolute;opacity:0;width:0;height:0}
+  .switch i{position:absolute;inset:0;background:var(--card2);border-radius:15px;transition:.2s}
+  .switch i::after{content:"";position:absolute;width:24px;height:24px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+  .switch input:checked + i{background:var(--a2)}
+  .switch input:checked + i::after{transform:translateX(20px)}
+
+  .btn{width:100%;border:0;border-radius:16px;padding:15px;font-size:16px;font-weight:700;color:#fff;background:var(--grad);transition:transform .1s,opacity .15s}
+  .btn:active{transform:scale(.98)}
+  .btn.ghost{background:var(--card2);color:var(--text)}
+  .btn + .btn{margin-top:10px}
+
+  /* ---------- Карточки ---------- */
+  .card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px;margin-bottom:12px}
+  .card-top{display:flex;gap:12px;align-items:flex-start}
+  .cover{width:56px;height:56px;border-radius:16px;background:var(--card2);display:grid;place-items:center;font-size:30px;flex:0 0 56px}
+  .title{font-weight:700;font-size:16px;word-break:break-word}
+  .meta{color:var(--muted);font-size:13px;margin-top:4px;line-height:1.45;word-break:break-word}
+  .from{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);margin-bottom:12px}
+  .from b{color:var(--text)}
+  .ava{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:800;color:#fff}
+  .bar{height:6px;background:var(--card2);border-radius:3px;margin-top:12px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--grad);border-radius:3px}
+  .bar-txt{font-size:12px;color:var(--muted);margin-top:6px}
+  .row{display:flex;gap:8px;margin-top:14px}
+  .row .btn{padding:12px;font-size:14px;border-radius:13px;margin:0}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:3px 8px;border-radius:7px;background:var(--card2);color:var(--muted);margin:6px 6px 0 0}
+  .tag.going{background:rgba(46,204,113,.15);color:#3ddc84}
+  .x{background:none;border:0;color:var(--muted);font-size:22px;line-height:1;padding:2px 4px;margin-left:auto}
+  .note{font-size:12px;color:var(--muted);background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:10px 12px;margin-bottom:14px}
+  .empty{text-align:center;color:var(--muted);padding:36px 20px}
+  .empty .big{font-size:46px;margin-bottom:10px}
+
+  /* ---------- Профиль ---------- */
+  .prof-head{display:flex;flex-direction:column;align-items:center;margin:6px 0 18px}
+  .ring{padding:3px;border-radius:50%;background:var(--grad);position:relative}
+  .avatar{width:116px;height:116px;border-radius:50%;background:var(--card2) center/cover no-repeat;border:4px solid var(--bg);display:grid;place-items:center;font-size:42px;font-weight:800;color:#fff}
+  .cam{position:absolute;right:0;bottom:2px;width:38px;height:38px;border-radius:50%;background:var(--a1);border:3px solid var(--bg);display:grid;place-items:center;color:#fff}
+  .cam svg{width:18px;height:18px}
+  .prof-name{font-size:21px;font-weight:800;margin-top:12px;text-align:center}
+  .prof-user{color:var(--muted);font-size:14px}
+  .stats{display:flex;gap:10px;margin-bottom:6px}
+  .stat{flex:1;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;text-align:center}
+  .stat b{display:block;font-size:22px}
+  .stat span{font-size:12px;color:var(--muted)}
+  .two{display:flex;gap:10px}
+  .two .field{flex:1}
+
+  /* ---------- Заглушки и уведомления ---------- */
+  .stub-box{text-align:center;padding:90px 24px 0}
+  .stub-box .big{font-size:64px;margin-bottom:14px}
+  .stub-box p{color:var(--muted);margin-top:6px}
+  .toast{position:fixed;left:50%;bottom:calc(var(--nav-h) + 22px + var(--safe-b));transform:translateX(-50%) translateY(16px);background:#fff;color:#111;padding:11px 18px;border-radius:14px;font-weight:600;font-size:14px;opacity:0;transition:.25s;pointer-events:none;z-index:30;max-width:calc(100% - 32px);text-align:center}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  .success-ico{width:84px;height:84px;border-radius:28px;background:var(--grad);display:grid;place-items:center;font-size:42px;margin:20px auto 16px;box-shadow:0 10px 30px rgba(139,92,255,.4)}
+  .center{text-align:center}
+</style>
+</head>
+<body>
+
+<!-- ================= ЗАГЛУШКА 1 ================= -->
+<section class="screen" id="s-stub1">
+  <div class="stub-box">
+    <div class="big">🚧</div>
+    <h1>Скоро здесь</h1>
+    <p>Этот раздел пока в разработке</p>
+  </div>
+</section>
+
+<!-- ================= ЗАГЛУШКА 2 ================= -->
+<section class="screen" id="s-stub2">
+  <div class="stub-box">
+    <div class="big">🛠️</div>
+    <h1>Скоро здесь</h1>
+    <p>Этот раздел пока в разработке</p>
+  </div>
+</section>
+
+<!-- ================= СОЗДАТЬ ТУСОВКУ ================= -->
+<section class="screen" id="s-create">
+  <h1>Создать тусовку</h1>
+  <p class="sub">Собери компанию — люди сами найдутся 🙌</p>
+
+  <div class="field">
+    <span class="lbl">Обложка</span>
+    <div class="emojis" id="emojiPicker"></div>
+  </div>
+
+  <div class="field">
+    <label class="lbl" for="fTitle">Название <b>*</b></label>
+    <input class="input" id="fTitle" maxlength="60" placeholder="Например: Настолки и пицца в пятницу">
+  </div>
+
+  <div class="field">
+    <span class="lbl">Формат</span>
+    <div class="chips" id="typeChips"></div>
+  </div>
+
+  <div class="field">
+    <label class="lbl" for="fWhen">Когда <b>*</b></label>
+    <input class="input" id="fWhen" type="datetime-local">
+  </div>
+
+  <div class="field">
+    <label class="lbl" for="fPlace">Где <b>*</b></label>
+    <input class="input" id="fPlace" maxlength="100" placeholder="Адрес, бар, парк или район">
+  </div>
+
+  <div class="field">
+    <span class="lbl">Сколько человек, включая тебя</span>
+    <div class="stepper">
+      <button type="button" id="maxMinus">−</button>
+      <span id="maxVal">6</span>
+      <button type="button" id="maxPlus">+</button>
+    </div>
+  </div>
+
+  <div class="field">
+    <label class="switch-row">
+      <span>Только по приглашениям<small>Тусовку увидят только те, кого ты позовёшь</small></span>
+      <span class="switch"><input type="checkbox" id="fPrivate"><i></i></span>
+    </label>
+    <label class="switch-row">
+      <span>Только 18+</span>
+      <span class="switch"><input type="checkbox" id="fAdult"><i></i></span>
+    </label>
+  </div>
+
+  <div class="field">
+    <label class="lbl" for="fDesc">Описание</label>
+    <textarea class="input" id="fDesc" maxlength="500" placeholder="Что будем делать, что взять с собой, какая атмосфера…"></textarea>
+  </div>
+
+  <button class="btn" id="createBtn">🎉 Создать тусовку</button>
+</section>
+
+<!-- ================= ТУСОВКА СОЗДАНА ================= -->
+<section class="screen" id="s-created">
+  <div class="success-ico">🥳</div>
+  <h1 class="center">Тусовка создана!</h1>
+  <p class="sub center">Теперь позови друзей или знакомых</p>
+  <div id="createdCard"></div>
+  <button class="btn" id="shareBtn">📨 Позвать друзей</button>
+  <button class="btn ghost" id="doneBtn">Готово</button>
+</section>
+
+<!-- ================= ПРИГЛАШЕНИЯ ================= -->
+<section class="screen" id="s-invites">
+  <h1>Приглашения</h1>
+  <p class="sub">Сюда приходят приглашения на тусовки</p>
+  <div class="note">👀 Пока это примеры. Настоящие приглашения от других людей появятся, когда подключим сервер.</div>
+  <div id="invitesList"></div>
+</section>
+
+<!-- ================= ПРОФИЛЬ ================= -->
+<section class="screen" id="s-profile">
+  <div class="prof-head">
+    <div class="ring">
+      <div class="avatar" id="avatar"></div>
+      <button class="cam" id="camBtn" aria-label="Загрузить фото">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>
+      </button>
+      <input type="file" id="photoInput" accept="image/*" hidden>
+    </div>
+    <div class="prof-name" id="profName">Твоё имя</div>
+    <div class="prof-user" id="profUser"></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><b id="stCreated">0</b><span>создал</span></div>
+    <div class="stat"><b id="stGoing">0</b><span>иду</span></div>
+  </div>
+
+  <div class="section-title">О себе</div>
+  <div class="field">
+    <label class="lbl" for="pName">Имя</label>
+    <input class="input" id="pName" maxlength="40" placeholder="Как тебя зовут">
+  </div>
+  <div class="two">
+    <div class="field">
+      <label class="lbl" for="pAge">Возраст</label>
+      <input class="input" id="pAge" type="number" inputmode="numeric" min="14" max="99" placeholder="—">
+    </div>
+    <div class="field">
+      <label class="lbl" for="pDistrict">Район</label>
+      <input class="input" id="pDistrict" maxlength="40" placeholder="Например: Арбат">
+    </div>
+  </div>
+  <div class="field">
+    <label class="lbl" for="pAbout">Пара слов о себе</label>
+    <textarea class="input" id="pAbout" maxlength="300" placeholder="Чем увлекаешься, какую компанию ищешь"></textarea>
+  </div>
+  <div class="field">
+    <span class="lbl">Интересы</span>
+    <div class="chips" id="interestChips"></div>
+  </div>
+  <button class="btn" id="saveProfile">Сохранить профиль</button>
+
+  <div class="section-title">Мои тусовки</div>
+  <div id="myParties"></div>
+</section>
+
+<!-- ================= НИЖНЯЯ ПАНЕЛЬ (5 кнопок) ================= -->
+<nav class="nav">
+  <button class="tab stub" data-go="stub1">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg>
+    Скоро
+  </button>
+  <button class="tab stub" data-go="stub2">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    Скоро
+  </button>
+  <button class="tab tab-center" data-go="create" aria-label="Создать тусовку">
+    <span class="plus"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg></span>
+  </button>
+  <button class="tab" data-go="invites">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/></svg>
+    Приглашения
+    <span class="badge" id="badge"></span>
+  </button>
+  <button class="tab" data-go="profile">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
+    Профиль
+  </button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   НАСТРОЙКИ — их можно менять
+   ========================================================= */
+// Ссылка на твоего бота (появится после создания бота в @BotFather), например 'https://t.me/tusovka_msk_bot'.
+// Она добавляется в сообщение-приглашение, которое ты отправляешь друзьям.
+const BOT_LINK = '';
+
+const EMOJIS = ['🎉','🍕','🎲','🎤','🍻','🏀','🎬','🎮','💃','🌃','🏕️','☕'];
+const TYPES = ['Домашняя вечеринка','Бар','Настолки','Караоке','Спорт','Прогулка','Кино','Игры','Другое'];
+const INTERESTS = ['Настолки','Караоке','Бары','Кино','Спорт','Музыка','Танцы','Прогулки','Видеоигры','Путешествия','Стендап','Кулинария'];
+
+/* =========================================================
+   Подключение к Telegram
+   ========================================================= */
+const tg = window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.initData !== undefined ? window.Telegram.WebApp : null;
+if (tg) {
+  tg.ready();
+  tg.expand();
+  try { tg.setHeaderColor('#0e0e13'); tg.setBackgroundColor('#0e0e13'); tg.setBottomBarColor && tg.setBottomBarColor('#101016'); } catch(e){}
+  try { tg.disableVerticalSwipes && tg.disableVerticalSwipes(); } catch(e){}
+}
+const tgUser = tg && tg.initDataUnsafe ? tg.initDataUnsafe.user : null;
+const haptic = (s='light') => { try { tg && tg.HapticFeedback.impactOccurred(s); } catch(e){} };
+const vibe   = (t='success') => { try { tg && tg.HapticFeedback.notificationOccurred(t); } catch(e){} };
+
+/* =========================================================
+   Хранилище (пока на устройстве пользователя)
+   ========================================================= */
+const store = {
+  get(k, d){ try { const v = localStorage.getItem('tus_' + k); return v ? JSON.parse(v) : d; } catch(e){ return d; } },
+  set(k, v){ try { localStorage.setItem('tus_' + k, JSON.stringify(v)); return true; } catch(e){ return false; } }
+};
+
+/* =========================================================
+   Вспомогательное
+   ========================================================= */
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = iso => {
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  return d.toLocaleString('ru-RU', { weekday:'short', day:'numeric', month:'long', hour:'2-digit', minute:'2-digit' });
+};
+const daysFromNow = (n, h) => { const d = new Date(); d.setDate(d.getDate() + n); d.setHours(h, 0, 0, 0); return d.toISOString(); };
+const initials = name => (name || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?';
+let toastTimer;
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+/* =========================================================
+   Данные
+   ========================================================= */
+const DEMO_INVITES = [
+  { id:'d1', emoji:'🎲', title:'Вечер настолок: Кодовые имена и Мафия', from:'Аня', color:'#ff7a59', when:daysFromNow(2,19), place:'Антикафе на Тверской', going:6, max:10, status:'new' },
+  { id:'d2', emoji:'🎤', title:'Караоке до утра', from:'Дима', color:'#5c8bff', when:daysFromNow(4,21), place:'Караоке-бар у Чистых прудов', going:4, max:8, status:'new' },
+  { id:'d3', emoji:'🏀', title:'Стритбол в парке, потом пицца', from:'Макс', color:'#22b573', when:daysFromNow(6,12), place:'Парк Горького, баскетбольная площадка', going:7, max:12, status:'new' }
+];
+
+let profile = store.get('profile', null) || {
+  name: tgUser ? [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ') : '',
+  age:'', district:'', about:'', interests:[], photo:''
+};
+let parties = store.get('parties', []);
+let invites = store.get('invites', DEMO_INVITES);
+
+/* =========================================================
+   Навигация
+   ========================================================= */
+function show(name){
+  document.querySelectorAll('.screen').forEach(s => s.classList.toggle('active', s.id === 's-' + name));
+  const tabName = name === 'created' ? 'create' : name;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.go === tabName));
+  window.scrollTo(0, 0);
+  if (name === 'invites') renderInvites();
+  if (name === 'profile') renderProfile();
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => {
+  haptic(t.dataset.go === 'create' ? 'medium' : 'light');
+  show(t.dataset.go);
+}));
+
+/* =========================================================
+   СОЗДАТЬ ТУСОВКУ
+   ========================================================= */
+const form = { emoji: EMOJIS[0], type: '', max: 6 };
+
+function buildCreateForm(){
+  $('emojiPicker').innerHTML = EMOJIS.map(e => `<button type="button" class="emo${e === form.emoji ? ' on' : ''}" data-e="${e}">${e}</button>`).join('');
+  $('typeChips').innerHTML = TYPES.map(t => `<button type="button" class="chip${t === form.type ? ' on' : ''}" data-t="${esc(t)}">${esc(t)}</button>`).join('');
+  $('maxVal').textContent = form.max;
+  // нельзя выбрать дату в прошлом
+  const now = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
+  $('fWhen').min = now.toISOString().slice(0, 16);
+}
+$('emojiPicker').addEventListener('click', e => {
+  const b = e.target.closest('.emo'); if (!b) return;
+  form.emoji = b.dataset.e; haptic(); buildCreateForm();
+});
+$('typeChips').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  form.type = form.type === b.dataset.t ? '' : b.dataset.t; haptic(); buildCreateForm();
+});
+$('maxMinus').onclick = () => { if (form.max > 2)  { form.max--; haptic(); $('maxVal').textContent = form.max; } };
+$('maxPlus').onclick  = () => { if (form.max < 50) { form.max++; haptic(); $('maxVal').textContent = form.max; } };
+['fTitle','fWhen','fPlace'].forEach(id => $(id).addEventListener('input', () => $(id).classList.remove('err')));
+
+$('createBtn').onclick = () => {
+  const title = $('fTitle').value.trim();
+  const when  = $('fWhen').value;
+  const place = $('fPlace').value.trim();
+  let bad = null;
+  if (!place) bad = 'fPlace';
+  if (!when || new Date(when) < new Date()) bad = 'fWhen';
+  if (!title) bad = 'fTitle';
+  if (bad) {
+    $(bad).classList.add('err'); $(bad).focus(); vibe('error');
+    toast(bad === 'fWhen' && when ? 'Дата должна быть в будущем' : 'Заполни поля со звёздочкой');
+    return;
+  }
+  const p = {
+    id: Date.now().toString(36), emoji: form.emoji, title, type: form.type, when: new Date(when).toISOString(),
+    place, max: form.max, private: $('fPrivate').checked, adult: $('fAdult').checked,
+    desc: $('fDesc').value.trim(), created: Date.now()
+  };
+  parties.unshift(p);
+  store.set('parties', parties);
+
+  // очистить форму
+  ['fTitle','fWhen','fPlace','fDesc'].forEach(id => $(id).value = '');
+  $('fPrivate').checked = false; $('fAdult').checked = false;
+  form.emoji = EMOJIS[0]; form.type = ''; form.max = 6; buildCreateForm();
+
+  vibe('success');
+  lastCreated = p;
+  $('createdCard').innerHTML = partyCard(p, false);
+  show('created');
+};
+
+let lastCreated = null;
+function inviteText(p){
+  return `${p.emoji} ${p.title}\n📅 ${fmt(p.when)}\n📍 ${p.place}\n\nЗову тебя на тусовку! 🎉`;
+}
+function shareParty(p){
+  const text = inviteText(p);
+  if (BOT_LINK) {
+    const url = 'https://t.me/share/url?url=' + encodeURIComponent(BOT_LINK) + '&text=' + encodeURIComponent(text);
+    if (tg) tg.openTelegramLink(url); else window.open(url, '_blank');
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(() => toast('Текст приглашения скопирован — отправь его другу'), () => toast('Не получилось скопировать'));
+  } else {
+    toast('Добавь ссылку на бота в настройках приложения');
+  }
+}
+$('shareBtn').onclick = () => { haptic(); lastCreated && shareParty(lastCreated); };
+$('doneBtn').onclick  = () => { haptic(); show('profile'); };
+
+/* =========================================================
+   ПРИГЛАШЕНИЯ
+   ========================================================= */
+function inviteCard(i){
+  const pct = Math.min(100, Math.round(i.going / i.max * 100));
+  const going = i.status === 'going';
+  return `
+  <div class="card">
+    <div class="from"><span class="ava" style="background:${esc(i.color)}">${esc(initials(i.from))}</span><span><b>${esc(i.from)}</b> зовёт тебя</span></div>
+    <div class="card-top">
+      <div class="cover">${esc(i.emoji)}</div>
+      <div>
+        <div class="title">${esc(i.title)}</div>
+        <div class="meta">📅 ${esc(fmt(i.when))}<br>📍 ${esc(i.place)}</div>
+        ${going ? '<span class="tag going">✓ Ты идёшь</span>' : ''}
+      </div>
+    </div>
+    <div class="bar"><i style="width:${pct}%"></i></div>
+    <div class="bar-txt">Идут ${i.going} из ${i.max}</div>
+    <div class="row">
+      ${going
+        ? `<button class="btn ghost" data-act="undo" data-id="${esc(i.id)}">Передумал</button>`
+        : `<button class="btn ghost" data-act="no" data-id="${esc(i.id)}">Не смогу</button>
+           <button class="btn" data-act="yes" data-id="${esc(i.id)}">Пойду! 🙌</button>`}
+    </div>
+  </div>`;
+}
+function renderInvites(){
+  const fresh = invites.filter(i => i.status === 'new');
+  const going = invites.filter(i => i.status === 'going');
+  let html = '';
+  if (fresh.length) html += `<div class="section-title">Новые</div>` + fresh.map(inviteCard).join('');
+  if (going.length) html += `<div class="section-title">Я иду</div>` + going.map(inviteCard).join('');
+  if (!html) html = `<div class="empty"><div class="big">📭</div>Приглашений пока нет.<br>Создай свою тусовку — и тебя позовут в ответ!</div>`;
+  $('invitesList').innerHTML = html;
+  updateBadge();
+}
+$('invitesList').addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const inv = invites.find(i => i.id === b.dataset.id); if (!inv) return;
+  if (b.dataset.act === 'yes') {
+    if (inv.going >= inv.max) { vibe('error'); toast('Мест уже нет 😔'); return; }
+    inv.status = 'going'; inv.going++; vibe('success'); toast('Супер, ты в деле! 🎉');
+  } else if (b.dataset.act === 'no') {
+    inv.status = 'declined'; haptic(); toast('Приглашение отклонено');
+  } else if (b.dataset.act === 'undo') {
+    inv.status = 'new'; inv.going = Math.max(0, inv.going - 1); haptic(); toast('Окей, отменили');
+  }
+  store.set('invites', invites);
+  renderInvites();
+});
+function updateBadge(){
+  const n = invites.filter(i => i.status === 'new').length;
+  $('badge').textContent = n ? n : '';
+}
+
+/* =========================================================
+   ПРОФИЛЬ
+   ========================================================= */
+function paintAvatar(){
+  const photo = profile.photo || (tgUser && tgUser.photo_url) || '';
+  const a = $('avatar');
+  if (photo) { a.style.backgroundImage = `url("${photo}")`; a.textContent = ''; }
+  else { a.style.backgroundImage = ''; a.textContent = initials(profile.name); }
+}
+function partyCard(p, withDelete){
+  return `
+  <div class="card">
+    <div class="card-top">
+      <div class="cover">${esc(p.emoji)}</div>
+      <div style="flex:1;min-width:0">
+        <div class="title">${esc(p.title)}</div>
+        <div class="meta">📅 ${esc(fmt(p.when))}<br>📍 ${esc(p.place)}</div>
+        ${p.type ? `<span class="tag">${esc(p.type)}</span>` : ''}<span class="tag">до ${p.max} чел.</span>${p.private ? '<span class="tag">🔒 по приглашениям</span>' : ''}${p.adult ? '<span class="tag">18+</span>' : ''}
+        ${p.desc ? `<div class="meta" style="margin-top:8px">${esc(p.desc)}</div>` : ''}
+      </div>
+      ${withDelete ? `<button class="x" data-del="${esc(p.id)}" aria-label="Удалить">×</button>` : ''}
+    </div>
+    ${withDelete ? `<div class="row"><button class="btn ghost" data-share="${esc(p.id)}">📨 Позвать друзей</button></div>` : ''}
+  </div>`;
+}
+function renderInterestChips(){
+  $('interestChips').innerHTML = INTERESTS.map(t =>
+    `<button type="button" class="chip${profile.interests.includes(t) ? ' on' : ''}" data-i="${esc(t)}">${esc(t)}</button>`).join('');
+}
+function renderProfile(){
+  paintAvatar();
+  $('profName').textContent = profile.name || 'Твоё имя';
+  $('profUser').textContent = tgUser && tgUser.username ? '@' + tgUser.username : '';
+  $('pName').value = profile.name; $('pAge').value = profile.age;
+  $('pDistrict').value = profile.district; $('pAbout').value = profile.about;
+  renderInterestChips();
+  $('stCreated').textContent = parties.length;
+  $('stGoing').textContent = invites.filter(i => i.status === 'going').length;
+  $('myParties').innerHTML = parties.length
+    ? parties.map(p => partyCard(p, true)).join('')
+    : `<div class="empty"><div class="big">🪩</div>Ты ещё не создал ни одной тусовки.<br>Жми на «+» внизу!</div>`;
+}
+$('interestChips').addEventListener('click', e => {
+  const b = e.target.closest('.chip'); if (!b) return;
+  const t = b.dataset.i;
+  profile.interests = profile.interests.includes(t) ? profile.interests.filter(x => x !== t) : [...profile.interests, t];
+  haptic(); renderInterestChips();
+});
+$('saveProfile').onclick = () => {
+  profile.name = $('pName').value.trim();
+  profile.age = $('pAge').value.trim();
+  profile.district = $('pDistrict').value.trim();
+  profile.about = $('pAbout').value.trim();
+  if (store.set('profile', profile)) { vibe('success'); toast('Профиль сохранён ✓'); }
+  else { vibe('error'); toast('Не удалось сохранить'); }
+  $('profName').textContent = profile.name || 'Твоё имя';
+  paintAvatar();
+};
+$('myParties').addEventListener('click', e => {
+  const del = e.target.closest('[data-del]');
+  const sh = e.target.closest('[data-share]');
+  if (del) {
+    parties = parties.filter(p => p.id !== del.dataset.del);
+    store.set('parties', parties); haptic(); toast('Тусовка удалена'); renderProfile();
+  } else if (sh) {
+    const p = parties.find(x => x.id === sh.dataset.share); if (p) { haptic(); shareParty(p); }
+  }
+});
+
+// Загрузка фото: обрезаем до квадрата и уменьшаем, чтобы не занимало много места
+$('camBtn').onclick = () => $('photoInput').click();
+$('photoInput').onchange = e => {
+  const f = e.target.files && e.target.files[0]; if (!f) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const size = 360, m = Math.min(img.width, img.height);
+      const c = document.createElement('canvas'); c.width = c.height = size;
+      c.getContext('2d').drawImage(img, (img.width - m) / 2, (img.height - m) / 2, m, m, 0, 0, size, size);
+      profile.photo = c.toDataURL('image/jpeg', 0.85);
+      paintAvatar();
+      if (store.set('profile', profile)) { vibe('success'); toast('Фото обновлено 📸'); }
+      else toast('Фото слишком большое');
+    };
+    img.onerror = () => toast('Не получилось открыть это фото');
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(f);
+  e.target.value = '';
+};
+
+/* =========================================================
+   Старт
+   ========================================================= */
+buildCreateForm();
+updateBadge();
+show('create');
+</script>
+</body>
+</html>
