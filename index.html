@@ -142,6 +142,7 @@
   .pin.sel{background:var(--grad);border-color:#fff}
   .me-dot{width:16px;height:16px;border-radius:50%;background:#3d9bff;border:3px solid #fff;box-shadow:0 0 0 6px rgba(61,155,255,.25)}
   .leaflet-container{font-family:inherit;background:#1b1b22}
+  .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.9) contrast(.9) saturate(.6)}
   .leaflet-control-attribution{background:rgba(14,14,19,.7)!important;color:#777!important;font-size:9px!important}
   .leaflet-control-attribution a{color:#999!important}
   .picker{height:210px;border-radius:14px;overflow:hidden;border:1px solid var(--line);margin-top:10px;position:relative;z-index:0}
@@ -637,13 +638,13 @@ $('myParties').addEventListener('click', e => {
    КАРТА
    ========================================================= */
 const MSK = [55.7558, 37.6173];
-const TILE = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
-const TILE_ATTR = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> © <a href="https://carto.com/attributions">CARTO</a>';
+const TILE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+const TILE_ATTR = '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 const hasLeaflet = () => typeof window.L !== 'undefined';
 const plural = (n, a, b, c) => { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : (m10 >= 2 && m10 <= 4 && (m100 < 10 || m100 >= 20) ? b : c); };
 const pinIcon = (p, sel) => L.divIcon({ className: '', html: `<div class="pin${p.mine ? ' mine' : ''}${sel ? ' sel' : ''}"><span>${esc(p.emoji)}</span></div>`, iconSize: [42, 42], iconAnchor: [21, 51] });
 function addTiles(map){
-  L.tileLayer(TILE, { attribution: TILE_ATTR, subdomains: 'abcd', maxZoom: 19 }).addTo(map);
+  L.tileLayer(TILE, { attribution: TILE_ATTR, maxZoom: 19 }).addTo(map);
   map.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
 }
 
